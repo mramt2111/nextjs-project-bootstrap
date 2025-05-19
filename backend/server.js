@@ -150,6 +150,40 @@ app.get('/api/company-info', async (req, res) => {
   }
 });
 
+// API route to get historical data
+app.get('/api/historical-data', async (req, res) => {
+  const symbol = req.query.symbol;
+  const interval = req.query.interval || '1day'; // default to daily
+  if (!symbol || typeof symbol !== 'string') {
+    return res.status(400).json({ error: 'Symbol parameter is required' });
+  }
+
+  const cacheKey = `historical_data_${symbol}_${interval}`;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return res.json(cached);
+  }
+
+  try {
+    const response = await axios.get('https://api.twelvedata.com/time_series', {
+      params: {
+        symbol: symbol,
+        interval: interval,
+        apikey: process.env.TWELVE_DATA_API_KEY,
+        format: 'JSON',
+        outputsize: 30, // last 30 data points
+      },
+    });
+
+    const data = response.data;
+    cache.set(cacheKey, data);
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching historical data:', error);
+    res.status(500).json({ error: 'Failed to fetch historical data' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Backend server running on port ${PORT}`);
 });
